@@ -1,100 +1,108 @@
-# project-root
+# Multimodal Crime/Incident Report Analyzer
 
-A multi-media file processing toolkit for handling audio, PDF, image, video, and text files with integration support.
+A multimodal AI pipeline that analyzes crime and emergency incidents across five data types — audio, PDF documents, images, video, and text — then merges all findings into a unified incident dataset with computed severity scores.
 
 ## Project Structure
 
 ```
 project-root/
-├── audio/          # Audio file processing (MP3, WAV, FLAC, etc.)
-├── pdf/            # PDF document processing and generation
-├── images/         # Image processing and manipulation
-├── video/          # Video file processing and editing
-├── text/           # Text file processing and NLP tasks
-├── integration/    # Integration tests and cross-module utilities
-├── README.md       # Project documentation
-└── requirements.txt # Python dependencies
+├── audio/
+│   └── audio_analyst.py        # Whisper transcription + spaCy NER + sentiment
+├── pdf/
+│   └── pdf_analyst.py          # pdfplumber extraction + OCR fallback + NER
+├── images/
+│   └── image_analyst.py        # YOLOv8 object detection + scene classification + OCR
+├── video/
+│   └── video_analyst.py        # Frame extraction + YOLOv8 + motion detection
+├── text/
+│   └── text_analyst.py         # Crime report NER + sentiment + zero-shot classification
+├── integration/
+│   ├── merge.py                # Merges all 5 outputs into final dataset
+│   └── incident_mapping.csv    # Maps incident IDs to component IDs
+├── requirements.txt
+└── README.md
 ```
 
-## Getting Started
+## Components
+
+### 1. Audio Analyst (`audio/audio_analyst.py`)
+Transcribes emergency audio calls using OpenAI Whisper, extracts entities (events, locations) with spaCy, and runs HuggingFace sentiment analysis. Outputs `emergency_analysis.csv` with columns: `Call_ID`, `Transcript`, `Extracted_Event`, `Location`, `Sentiment`, `Urgency_Score`.
+
+### 2. PDF Analyst (`pdf/pdf_analyst.py`)
+Extracts text from PDF documents using pdfplumber with pytesseract + pdf2image OCR fallback for scanned files. Runs spaCy NER to identify departments, dates, and programs, and classifies document types. Outputs `pdf_analysis.csv` with columns: `Report_ID`, `Department`, `Doc_Type`, `Date`, `Program`, `Key_Detail`.
+
+### 3. Image Analyst (`images/image_analyst.py`)
+Runs YOLOv8 object detection via ultralytics, classifies scene types based on detected objects, and performs OCR with pytesseract. Outputs `image_analysis.csv` with columns: `Image_ID`, `Scene_Type`, `Objects_Detected`, `Bounding_Boxes`, `Confidence`.
+
+### 4. Video Analyst (`video/video_analyst.py`)
+Extracts every 15th frame from video using OpenCV, runs YOLOv8 detection, and performs motion detection via frame differencing. Classifies events such as Vehicle Movement, Crowd Activity, and Person Movement. Outputs `video_analysis.csv` with columns: `Clip_ID`, `Timestamp`, `Frame_ID`, `Event_Detected`, `Persons_Count`, `Confidence`.
+
+### 5. Text Analyst (`text/text_analyst.py`)
+Loads crime report CSVs, cleans text, extracts crime types and locations with spaCy NER, runs HuggingFace sentiment analysis and zero-shot classification (BART-MNLI). Outputs `text_analysis.csv` with columns: `Text_ID`, `Crime_Type`, `Location_Entity`, `Sentiment`, `Topic`, `Severity_Label`.
+
+### Integration (`integration/merge.py`)
+Loads all 5 analyst output CSVs, joins them via `incident_mapping.csv`, computes a weighted `Final_Severity` score (Critical/High/Medium/Low) from audio urgency, text severity, sentiment signals, video person counts, and image confidence. Saves `final_incident_dataset.csv`.
+
+## Installation
 
 ### Prerequisites
-
 - Python 3.8 or higher
-- - pip (Python package manager)
-  - - FFmpeg (required for audio and video processing)
-   
-    - ### Installation
-   
-    - 1. Clone the repository:
-      2. ```bash
-         git clone https://github.com/RahulKakani9999/project-root.git
-         cd project-root
-         ```
+- FFmpeg (required for audio and video processing)
+- Tesseract OCR (required for OCR fallback in PDF and image analysis)
+- poppler-utils (required for pdf2image)
 
-         2. Create a virtual environment (recommended):
-         3. ```bash
-            python -m venv venv
-            source venv/bin/activate  # On Windows: venv\Scripts\activate
-            ```
+### Setup
 
-            3. Install dependencies:
-            4. ```bash
-               pip install -r requirements.txt
-               ```
+1. Clone the repository:
+```bash
+git clone https://github.com/RahulKakani9999/project-root.git
+cd project-root
+```
 
-               ## Modules
+2. Create a virtual environment (recommended):
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-               ### Audio
-               Handles audio file processing including format conversion, feature extraction, and audio analysis using pydub, librosa, and soundfile.
+3. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-               ### PDF
-               Provides PDF reading, writing, and manipulation capabilities using PyPDF2 and reportlab.
+4. Download the spaCy model:
+```bash
+python -m spacy download en_core_web_sm
+```
 
-               ### Images
-               Supports image loading, transformation, filtering, and computer vision tasks using Pillow and OpenCV.
+## Running Each Script
 
-               ### Video
-               Manages video editing, frame extraction, and format conversion using moviepy and ffmpeg-python.
+Each analyst script runs independently. If no input files are found, it runs in **demo mode** with 5 sample rows.
 
-               ### Text
-               Processes text files with natural language processing and encoding detection using NLTK and chardet.
+```bash
+# 1. Analyze audio files (or generate demo output)
+python audio/audio_analyst.py
 
-               ### Integration
-               Contains integration tests and shared utilities that work across multiple modules.
+# 2. Analyze PDF documents (or generate demo output)
+python pdf/pdf_analyst.py
 
-               ## Usage
+# 3. Analyze images (or generate demo output)
+python images/image_analyst.py
 
-               ```python
-               # Example: Processing an audio file
-               from pydub import AudioSegment
-               audio = AudioSegment.from_file("audio/sample.mp3")
+# 4. Analyze video files (or generate demo output)
+python video/video_analyst.py
 
-               # Example: Reading a PDF
-               from PyPDF2 import PdfReader
-               reader = PdfReader("pdf/sample.pdf")
+# 5. Analyze crime report text (or generate demo output)
+python text/text_analyst.py
 
-               # Example: Processing an image
-               from PIL import Image
-               img = Image.open("images/sample.png")
-               ```
+# 6. Merge all outputs into the final incident dataset
+python integration/merge.py
+```
 
-               ## Running Tests
+## Output
 
-               ```bash
-               pytest integration/
-               ```
+The final merged dataset is saved to `integration/final_incident_dataset.csv` and includes fields from all five analysts plus a computed `Final_Severity` column (Critical, High, Medium, or Low).
 
-               ## Contributing
+## License
 
-               - Fork the repository
-               - Create a feature branch (`git checkout -b feature/your-feature`)
-               - Commit your changes (`git commit -m 'Add your feature'`)
-               - Push to the branch (`git push origin feature/your-feature`)
-               - Open a Pull Request
-
-               ## License
-
-               This project is open source and available under the [MIT License](LICENSE).
-
-               
+This project is open source and available under the [MIT License](LICENSE).
