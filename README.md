@@ -1,55 +1,74 @@
 # Multimodal Crime/Incident Report Analyzer
 
-A multimodal AI pipeline that analyzes crime and emergency incidents across five data types — audio, PDF documents, images, video, and text — then merges all findings into a unified incident dataset with computed severity scores.
+A multimodal AI pipeline developed for the **AI for Engineers** course that analyzes crime and emergency incidents across five data modalities — audio, PDF documents, images, video, and text. The system processes each modality independently using state-of-the-art AI models, then merges all findings into a unified incident dataset with computed severity scores for downstream analysis and dashboarding.
 
-## Project Structure
+## Project Description
+
+Emergency response and law enforcement agencies generate data across multiple formats — 911 call recordings, scanned police reports, surveillance footage, crime scene photographs, and typed incident narratives. Analyzing these in isolation misses critical cross-modal patterns.
+
+This project builds a **5-stage multimodal pipeline** that:
+
+1. Ingests raw data from five different sources and formats
+2. Applies AI models (Whisper, YOLOv8, spaCy, HuggingFace Transformers) to extract structured information
+3. Produces per-modality CSV outputs with standardized schemas
+4. Merges all outputs into a single incident-level dataset with a computed `Final_Severity` score
+5. Enables dashboard visualization of incident patterns, severity distributions, and geographic hotspots
+
+Each component runs independently and includes a **demo mode** with 5 sample rows when no input data is available.
+
+## System Architecture
 
 ```
-project-root/
-├── audio/
-│   └── audio_analyst.py        # Whisper transcription + spaCy NER + sentiment
-├── pdf/
-│   └── pdf_analyst.py          # pdfplumber extraction + OCR fallback + NER
-├── images/
-│   └── image_analyst.py        # YOLOv8 object detection + scene classification + OCR
-├── video/
-│   └── video_analyst.py        # Frame extraction + YOLOv8 + motion detection
-├── text/
-│   └── text_analyst.py         # Crime report NER + sentiment + zero-shot classification
-├── integration/
-│   ├── merge.py                # Merges all 5 outputs into final dataset
-│   └── incident_mapping.csv    # Maps incident IDs to component IDs
-├── requirements.txt
-└── README.md
+┌─────────────────────────────────────────────────────────────────┐
+│                    STAGE 1: DATA INGESTION                      │
+│  audio/*.wav  pdf/*.pdf  images/*.jpg  video/*.mp4  text/*.csv  │
+└──────┬────────────┬──────────┬───────────┬──────────┬───────────┘
+       │            │          │           │          │
+       ▼            ▼          ▼           ▼          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   STAGE 2: AI PROCESSING                        │
+│  Whisper     pdfplumber   YOLOv8     OpenCV+      spaCy NER    │
+│  Speech-to-  + OCR        Object     YOLOv8       HuggingFace  │
+│  Text        Fallback     Detection  Motion Det.  Zero-Shot    │
+│  spaCy NER   spaCy NER    OCR        Event        Sentiment    │
+│  Sentiment   Doc Classify Scene Type Classification            │
+└──────┬────────────┬──────────┬───────────┬──────────┬───────────┘
+       │            │          │           │          │
+       ▼            ▼          ▼           ▼          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               STAGE 3: INFORMATION EXTRACTION                   │
+│  emergency_   pdf_         image_      video_      text_        │
+│  analysis.csv analysis.csv analysis.csv analysis.csv analysis.csv│
+└──────┬────────────┬──────────┬───────────┬──────────┬───────────┘
+       │            │          │           │          │
+       └────────────┴──────────┴─────┬─────┴──────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               STAGE 4: DATASET GENERATION                       │
+│  integration/merge.py + incident_mapping.csv                    │
+│  ► Joins all 5 CSVs on incident mapping keys                   │
+│  ► Fills missing values with N/A                                │
+│  ► Computes Final_Severity (High / Medium / Low)                │
+│  ► Outputs final_incident_dataset.csv                           │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                  STAGE 5: DASHBOARD                              │
+│  Visualization of severity distributions, incident timelines,   │
+│  geographic hotspots, and cross-modal correlation analysis       │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-## Components
-
-### 1. Audio Analyst (`audio/audio_analyst.py`)
-Transcribes emergency audio calls using OpenAI Whisper, extracts entities (events, locations) with spaCy, and runs HuggingFace sentiment analysis. Outputs `emergency_analysis.csv` with columns: `Call_ID`, `Transcript`, `Extracted_Event`, `Location`, `Sentiment`, `Urgency_Score`.
-
-### 2. PDF Analyst (`pdf/pdf_analyst.py`)
-Extracts text from PDF documents using pdfplumber with pytesseract + pdf2image OCR fallback for scanned files. Runs spaCy NER to identify departments, dates, and programs, and classifies document types. Outputs `pdf_analysis.csv` with columns: `Report_ID`, `Department`, `Doc_Type`, `Date`, `Program`, `Key_Detail`.
-
-### 3. Image Analyst (`images/image_analyst.py`)
-Runs YOLOv8 object detection via ultralytics, classifies scene types based on detected objects, and performs OCR with pytesseract. Outputs `image_analysis.csv` with columns: `Image_ID`, `Scene_Type`, `Objects_Detected`, `Bounding_Boxes`, `Confidence`.
-
-### 4. Video Analyst (`video/video_analyst.py`)
-Extracts every 15th frame from video using OpenCV, runs YOLOv8 detection, and performs motion detection via frame differencing. Classifies events such as Vehicle Movement, Crowd Activity, and Person Movement. Outputs `video_analysis.csv` with columns: `Clip_ID`, `Timestamp`, `Frame_ID`, `Event_Detected`, `Persons_Count`, `Confidence`.
-
-### 5. Text Analyst (`text/text_analyst.py`)
-Loads crime report CSVs, cleans text, extracts crime types and locations with spaCy NER, runs HuggingFace sentiment analysis and zero-shot classification (BART-MNLI). Outputs `text_analysis.csv` with columns: `Text_ID`, `Crime_Type`, `Location_Entity`, `Sentiment`, `Topic`, `Severity_Label`.
-
-### Integration (`integration/merge.py`)
-Loads all 5 analyst output CSVs, joins them via `incident_mapping.csv`, computes a weighted `Final_Severity` score (Critical/High/Medium/Low) from audio urgency, text severity, sentiment signals, video person counts, and image confidence. Saves `final_incident_dataset.csv`.
 
 ## Installation
 
 ### Prerequisites
+
 - Python 3.8 or higher
 - FFmpeg (required for audio and video processing)
 - Tesseract OCR (required for OCR fallback in PDF and image analysis)
-- poppler-utils (required for pdf2image)
+- poppler-utils (required for pdf2image PDF-to-image conversion)
 
 ### Setup
 
@@ -59,49 +78,94 @@ git clone https://github.com/RahulKakani9999/project-root.git
 cd project-root
 ```
 
-2. Create a virtual environment (recommended):
+2. Create and activate a virtual environment (recommended):
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. Install Python dependencies:
+3. Install all Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Download the spaCy model:
+4. Download the spaCy English language model:
 ```bash
 python -m spacy download en_core_web_sm
 ```
 
-## Running Each Script
+## Usage
 
-Each analyst script runs independently. If no input files are found, it runs in **demo mode** with 5 sample rows.
+Each analyst script processes files in its own directory. If no input files are found, it automatically runs in **demo mode** with 5 sample rows.
+
+### Step 1: Run Individual Analysts
 
 ```bash
-# 1. Analyze audio files (or generate demo output)
+# Audio: Transcribe 911 calls, extract entities, analyze sentiment
 python audio/audio_analyst.py
 
-# 2. Analyze PDF documents (or generate demo output)
+# PDF: Extract text from police/government reports, classify documents
 python pdf/pdf_analyst.py
 
-# 3. Analyze images (or generate demo output)
+# Images: Detect objects in crime scene photos, classify scenes
 python images/image_analyst.py
 
-# 4. Analyze video files (or generate demo output)
+# Video: Extract frames from surveillance footage, detect motion and events
 python video/video_analyst.py
 
-# 5. Analyze crime report text (or generate demo output)
+# Text: Analyze crime report narratives, classify crime types and severity
 python text/text_analyst.py
+```
 
-# 6. Merge all outputs into the final incident dataset
+### Step 2: Merge into Final Dataset
+
+```bash
+# Merge all 5 outputs into a unified incident dataset with Final_Severity
 python integration/merge.py
 ```
 
-## Output
+The final output is saved to `integration/final_incident_dataset.csv`.
 
-The final merged dataset is saved to `integration/final_incident_dataset.csv` and includes fields from all five analysts plus a computed `Final_Severity` column (Critical, High, Medium, or Low).
+## Project Structure
+
+```
+project-root/
+├── audio/
+│   └── audio_analyst.py            # Whisper transcription + spaCy NER + sentiment
+├── pdf/
+│   └── pdf_analyst.py              # pdfplumber + OCR fallback + NER + doc classification
+├── images/
+│   └── image_analyst.py            # YOLOv8 object detection + scene classification + OCR
+├── video/
+│   └── video_analyst.py            # Frame extraction + YOLOv8 + motion detection
+├── text/
+│   └── text_analyst.py             # Crime report NER + sentiment + zero-shot classification
+├── integration/
+│   ├── merge.py                    # Merges all 5 CSVs into final incident dataset
+│   └── incident_mapping.csv        # Maps incident IDs to per-modality component IDs
+├── sample_data/
+│   └── README.md                   # Dataset download links and instructions
+├── requirements.txt                # Python dependencies
+└── README.md                       # Project documentation
+```
+
+## Technologies Used
+
+| Category | Technology | Purpose |
+|---|---|---|
+| Speech-to-Text | OpenAI Whisper | Transcribe emergency audio recordings |
+| PDF Processing | pdfplumber | Extract text from native PDF documents |
+| OCR | pytesseract, pdf2image | Extract text from scanned PDFs and images |
+| Object Detection | YOLOv8 (ultralytics) | Detect objects in images and video frames |
+| Computer Vision | OpenCV | Frame extraction, motion detection, image I/O |
+| NLP - NER | spaCy (en_core_web_sm) | Named entity recognition across all text modalities |
+| NLP - Sentiment | HuggingFace Transformers (DistilBERT) | Sentiment analysis on transcripts and reports |
+| NLP - Classification | HuggingFace Transformers (BART-MNLI) | Zero-shot topic classification for crime reports |
+| Deep Learning | PyTorch | Backend for Whisper, YOLOv8, and Transformer models |
+| NLP Toolkit | NLTK | Text preprocessing and tokenization |
+| Data Processing | pandas, NumPy | Data manipulation, merging, and CSV I/O |
+| Image Processing | Pillow, imageio | Image loading and format conversion |
+| Video Processing | moviepy | Video editing and format support |
 
 ## License
 
