@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multimodal Crime/Incident Report Analyzer - Pipeline Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+    color: #f8fafc;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #94a3b8;
+    margin-bottom: 40px;
+    font-weight: 400;
+  }
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+    max-width: 1400px;
+    position: relative;
+  }
+  .stage {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .stage-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #64748b;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  .box {
+    border-radius: 10px;
+    padding: 14px 16px;
+    width: 170px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.5;
+    border: 1px solid;
+    position: relative;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .box .icon { font-size: 20px; display: block; margin-bottom: 6px; }
+  .box .title { font-weight: 700; font-size: 13px; display: block; margin-bottom: 3px; }
+  .box .detail { font-size: 10.5px; color: inherit; opacity: 0.8; display: block; }
+
+  /* Input sources - blue */
+  .input-box {
+    background: linear-gradient(135deg, #1e3a5f 0%, #172554 100%);
+    border-color: #2563eb;
+    color: #bfdbfe;
+  }
+  /* AI Processing - purple */
+  .process-box {
+    background: linear-gradient(135deg, #3b1f6e 0%, #2e1065 100%);
+    border-color: #7c3aed;
+    color: #ddd6fe;
+    width: 190px;
+  }
+  /* CSV Outputs - teal */
+  .output-box {
+    background: linear-gradient(135deg, #134e4a 0%, #042f2e 100%);
+    border-color: #14b8a6;
+    color: #99f6e4;
+    width: 160px;
+    padding: 10px 12px;
+  }
+  /* Merge - amber */
+  .merge-box {
+    background: linear-gradient(135deg, #78350f 0%, #451a03 100%);
+    border-color: #f59e0b;
+    color: #fef3c7;
+    width: 180px;
+    padding: 20px 16px;
+  }
+  /* Final - green */
+  .final-box {
+    background: linear-gradient(135deg, #14532d 0%, #052e16 100%);
+    border-color: #22c55e;
+    color: #bbf7d0;
+    width: 190px;
+    padding: 20px 16px;
+  }
+
+  /* Arrow columns */
+  .arrows {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 2px;
+  }
+  .arrow-row {
+    display: flex;
+    align-items: center;
+    height: 56px;
+  }
+  .arrow-merge {
+    display: flex;
+    align-items: center;
+    height: 280px;
+  }
+
+  /* SVG arrows */
+  svg.arrow-svg { overflow: visible; }
+  .arrow-line {
+    stroke-width: 2;
+    fill: none;
+    stroke-dasharray: 6 3;
+    animation: dash 1.5s linear infinite;
+  }
+  @keyframes dash {
+    to { stroke-dashoffset: -18; }
+  }
+  .arrow-head { stroke-width: 2; }
+
+  .a-blue .arrow-line, .a-blue .arrow-head { stroke: #3b82f6; fill: #3b82f6; }
+  .a-purple .arrow-line, .a-purple .arrow-head { stroke: #8b5cf6; fill: #8b5cf6; }
+  .a-teal .arrow-line, .a-teal .arrow-head { stroke: #14b8a6; fill: #14b8a6; }
+  .a-amber .arrow-line, .a-amber .arrow-head { stroke: #f59e0b; fill: #f59e0b; }
+  .a-green .arrow-line, .a-green .arrow-head { stroke: #22c55e; fill: #22c55e; }
+
+  /* Merge converging arrows via SVG overlay */
+  .merge-arrows-container {
+    position: relative;
+    width: 50px;
+    flex-shrink: 0;
+  }
+  .merge-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: visible;
+  }
+
+  /* Stage number badges */
+  .stage-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .sn-1 { background: #1e40af; color: #bfdbfe; }
+  .sn-2 { background: #5b21b6; color: #ddd6fe; }
+  .sn-3 { background: #0f766e; color: #99f6e4; }
+  .sn-4 { background: #92400e; color: #fef3c7; }
+  .sn-5 { background: #166534; color: #bbf7d0; }
+
+  .footer {
+    margin-top: 40px;
+    font-size: 12px;
+    color: #475569;
+  }
+</style>
+</head>
+<body>
+
+<h1>Multimodal Crime/Incident Report Analyzer</h1>
+<p class="subtitle">AI for Engineers &mdash; 5-Stage Processing Pipeline Architecture</p>
+
+<div class="pipeline">
+
+  <!-- STAGE 1: Input Sources -->
+  <div class="stage">
+    <div class="stage-label"><span class="stage-num sn-1">1</span><br>Data Ingestion</div>
+    <div class="box input-box">
+      <span class="icon">&#127908;</span>
+      <span class="title">Audio</span>
+      <span class="detail">.wav files<br>911 emergency calls</span>
+    </div>
+    <div class="box input-box">
+      <span class="icon">&#128196;</span>
+      <span class="title">PDF</span>
+      <span class="detail">.pdf files<br>Police &amp; gov reports</span>
+    </div>
+    <div class="box input-box">
+      <span class="icon">&#128247;</span>
+      <span class="title">Images</span>
+      <span class="detail">.jpg / .png files<br>Crime scene photos</span>
+    </div>
+    <div class="box input-box">
+      <span class="icon">&#127909;</span>
+      <span class="title">Video</span>
+      <span class="detail">.mpg files<br>Surveillance footage</span>
+    </div>
+    <div class="box input-box">
+      <span class="icon">&#128221;</span>
+      <span class="title">Text</span>
+      <span class="detail">.csv files<br>Crime report narratives</span>
+    </div>
+  </div>
+
+  <!-- Arrows 1→2 -->
+  <div class="arrows">
+    <div class="arrow-row"><svg class="arrow-svg a-blue" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-blue" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-blue" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-blue" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-blue" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+  </div>
+
+  <!-- STAGE 2: AI Processing -->
+  <div class="stage">
+    <div class="stage-label"><span class="stage-num sn-2">2</span><br>AI Processing</div>
+    <div class="box process-box">
+      <span class="title">Whisper + spaCy</span>
+      <span class="detail">Speech-to-Text<br>NER + Sentiment Analysis</span>
+    </div>
+    <div class="box process-box">
+      <span class="title">pdfplumber + OCR</span>
+      <span class="detail">pytesseract fallback<br>spaCy NER + Doc Classify</span>
+    </div>
+    <div class="box process-box">
+      <span class="title">YOLOv8 + OCR</span>
+      <span class="detail">Object Detection<br>Scene Classification</span>
+    </div>
+    <div class="box process-box">
+      <span class="title">OpenCV + YOLOv8</span>
+      <span class="detail">Frame Extraction<br>Motion Detection</span>
+    </div>
+    <div class="box process-box">
+      <span class="title">spaCy + HuggingFace</span>
+      <span class="detail">NER + Sentiment<br>Zero-shot Classification</span>
+    </div>
+  </div>
+
+  <!-- Arrows 2→3 -->
+  <div class="arrows">
+    <div class="arrow-row"><svg class="arrow-svg a-purple" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-purple" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-purple" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-purple" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+    <div class="arrow-row"><svg class="arrow-svg a-purple" width="40" height="2"><line class="arrow-line" x1="0" y1="1" x2="30" y2="1"/><polygon class="arrow-head" points="28,-4 36,1 28,6"/></svg></div>
+  </div>
+
+  <!-- STAGE 3: CSV Outputs -->
+  <div class="stage">
+    <div class="stage-label"><span class="stage-num sn-3">3</span><br>CSV Outputs</div>
+    <div class="box output-box">
+      <span class="title">emergency_analysis.csv</span>
+      <span class="detail">Call_ID, Transcript,<br>Event, Location, Urgency</span>
+    </div>
+    <div class="box output-box">
+      <span class="title">pdf_analysis.csv</span>
+      <span class="detail">Report_ID, Department,<br>Doc_Type, Date, Program</span>
+    </div>
+    <div class="box output-box">
+      <span class="title">image_analysis.csv</span>
+      <span class="detail">Image_ID, Scene_Type,<br>Objects, BBoxes, Conf</span>
+    </div>
+    <div class="box output-box">
+      <span class="title">video_analysis.csv</span>
+      <span class="detail">Clip_ID, Timestamp,<br>Event, Persons, Conf</span>
+    </div>
+    <div class="box output-box">
+      <span class="title">text_analysis.csv</span>
+      <span class="detail">Text_ID, Crime_Type,<br>Location, Sentiment, Topic</span>
+    </div>
+  </div>
+
+  <!-- Converging arrows 3→4 (SVG overlay) -->
+  <div class="merge-arrows-container" style="height: 340px;">
+    <svg class="merge-svg a-teal" width="50" height="340" viewBox="0 50 50 340">
+      <!-- Row 1 (top) -->
+      <path class="arrow-line" d="M0,90 C25,90 25,200 45,200" />
+      <!-- Row 2 -->
+      <path class="arrow-line" d="M0,158 C25,158 25,200 45,200" />
+      <!-- Row 3 (center) -->
+      <line class="arrow-line" x1="0" y1="224" x2="45" y2="224" />
+      <!-- Row 4 -->
+      <path class="arrow-line" d="M0,292 C25,292 25,248 45,248" />
+      <!-- Row 5 (bottom) -->
+      <path class="arrow-line" d="M0,358 C25,358 25,248 45,248" />
+      <!-- Arrowhead -->
+      <polygon class="arrow-head" points="42,216 50,224 42,232" />
+    </svg>
+  </div>
+
+  <!-- STAGE 4: Merge -->
+  <div class="stage">
+    <div class="stage-label"><span class="stage-num sn-4">4</span><br>Integration</div>
+    <div class="box merge-box">
+      <span class="icon">&#128279;</span>
+      <span class="title">merge.py</span>
+      <span class="detail">incident_mapping.csv<br>Join on Incident IDs<br>Fill N/A &bull; Compute<br>Final_Severity</span>
+    </div>
+  </div>
+
+  <!-- Arrow 4→5 -->
+  <div class="arrows">
+    <div class="arrow-row">
+      <svg class="arrow-svg a-amber" width="50" height="2">
+        <line class="arrow-line" x1="0" y1="1" x2="40" y2="1"/>
+        <polygon class="arrow-head" points="38,-4 46,1 38,6"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- STAGE 5: Final Dataset -->
+  <div class="stage">
+    <div class="stage-label"><span class="stage-num sn-5">5</span><br>Final Output</div>
+    <div class="box final-box">
+      <span class="icon">&#9989;</span>
+      <span class="title">final_incident_dataset.csv</span>
+      <span class="detail">Unified multimodal dataset<br>with Final_Severity<br>(High / Medium / Low)<br>Ready for dashboard</span>
+    </div>
+  </div>
+
+</div>
+
+<p class="footer">Multimodal Crime/Incident Report Analyzer &mdash; AI for Engineers Course Project</p>
+
+</body>
+</html>
