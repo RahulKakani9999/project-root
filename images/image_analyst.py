@@ -185,10 +185,12 @@ def write_csv(rows, output_path):
 
 
 def main():
-    image_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(image_dir, "image_analysis.csv")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_dir = os.path.join(project_root, "sample_data", "images")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(output_dir, "image_analysis.csv")
 
-    rows = process_image_files(image_dir)
+    rows = process_image_files(input_dir)
 
     if rows is None:
         print("No image files found. Running in demo mode with sample data.")

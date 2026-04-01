@@ -205,10 +205,12 @@ def write_csv(rows, output_path):
 
 
 def main():
-    video_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(video_dir, "video_analysis.csv")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_dir = os.path.join(project_root, "sample_data", "video")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(output_dir, "video_analysis.csv")
 
-    rows = process_video_files(video_dir)
+    rows = process_video_files(input_dir)
 
     if rows is None:
         print("No video files found. Running in demo mode with sample data.")

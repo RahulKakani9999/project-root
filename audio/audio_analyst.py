@@ -138,10 +138,12 @@ def write_csv(rows, output_path):
 
 
 def main():
-    audio_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(audio_dir, "emergency_analysis.csv")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_dir = os.path.join(project_root, "sample_data", "audio")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(output_dir, "emergency_analysis.csv")
 
-    rows = process_audio_files(audio_dir)
+    rows = process_audio_files(input_dir)
 
     if rows is None:
         print("No audio files found. Running in demo mode with sample data.")

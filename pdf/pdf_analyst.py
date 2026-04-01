@@ -198,10 +198,12 @@ def write_csv(rows, output_path):
 
 
 def main():
-    pdf_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(pdf_dir, "pdf_analysis.csv")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_dir = os.path.join(project_root, "sample_data", "pdf")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(output_dir, "pdf_analysis.csv")
 
-    rows = process_pdf_files(pdf_dir)
+    rows = process_pdf_files(input_dir)
 
     if rows is None:
         print("No PDF files found. Running in demo mode with sample data.")

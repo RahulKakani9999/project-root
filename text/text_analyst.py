@@ -221,10 +221,12 @@ def write_csv(rows, output_path):
 
 
 def main():
-    text_dir = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(text_dir, "text_analysis.csv")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    input_dir = os.path.join(project_root, "sample_data", "text")
+    output_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(output_dir, "text_analysis.csv")
 
-    rows = process_reports(text_dir)
+    rows = process_reports(input_dir)
 
     if rows is None:
         print("No crime report CSV found. Running in demo mode with sample data.")
